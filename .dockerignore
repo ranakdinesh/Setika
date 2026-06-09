@@ -1,0 +1,26 @@
+# Git
+.git
+.gitignore
+
+# Docs
+*.md
+docs/
+
+# Dev files
+.env
+keys/
+*.pem
+
+# UI dev artifacts
+ui/studio/.next
+ui/studio/node_modules
+ui/studio/out
+
+# Test files
+*_test.go
+
+# IDE
+.idea
+.vscode
+*.swp
+.DS_Store

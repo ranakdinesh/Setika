@@ -1,0 +1,22 @@
+{
+  "name": "template",
+  "version": "0.1.0",
+  "description": "Reusable orchestration layer for app setup, identity notifications, template rendering, and file storage handoff.",
+  "go_package": "y",
+  "private": true,
+  "status": "alpha",
+  "required_env": [],
+  "optional_env": [],
+  "permissions": [],
+  "role_templates": [],
+  "has_sqlc": false,
+  "config_struct": "TemplateConfig",
+  "config_env_prefix": "TEMPLATE_",
+  "app_field": "Template *template.Module",
+  "app_value": "Template: templateModule,",
+  "wire_code": {
+    "import": "template \"y\"",
+    "init": "templateModule, err := template.New(ctx, template.Options{Messaging: templateMessagingAdapter, Storage: templateStorageAdapter, Logger: templateLogger})\nif err != nil { return nil, fmt.Errorf(\"template: %w\", err) }",
+    "routes": ""
+  }
+}

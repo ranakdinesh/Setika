@@ -1,0 +1,140 @@
+version: '3.9'
+
+services:
+
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB:       ${POSTGRES_DB:-spur}
+      POSTGRES_USER:     ${POSTGRES_USER:-spur}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-changeme}
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-spur}"]
+      interval: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+
+  backend:
+    build:
+      context: ..
+      dockerfile: Dockerfile.backend
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      DATABASE_URL: postgres://${POSTGRES_USER:-spur}:${POSTGRES_PASSWORD:-changeme}@postgres:5432/${POSTGRES_DB:-spur}?sslmode=disable
+      REDIS_URL: redis://redis:6379
+    ports:
+      - "8080:8080"
+    volumes:
+      - ../keys:/app/keys:ro
+      - ./data:/app/data
+    labels:
+      app: spur
+      module: backend
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    logging:
+      driver: json-file
+      options:
+        max-size: "50m"
+        max-file: "5"
+        tag: "{{.Name}}"
+
+  studio:
+    build:
+      context: .
+      dockerfile: Dockerfile.ui
+      args:
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:8080}
+        NEXT_PUBLIC_THEME:   ${NEXT_PUBLIC_THEME:-spur}
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    labels:
+      app: spur
+      module: studio
+    depends_on:
+      - backend
+
+  temporal:
+    image: temporalio/auto-setup:1.22
+    profiles: ["temporal"]
+    environment:
+      DB: postgresql
+      DB_PORT: 5432
+      POSTGRES_USER: ${POSTGRES_USER:-spur}
+      POSTGRES_PWD:  ${POSTGRES_PASSWORD:-changeme}
+      POSTGRES_SEEDS: postgres
+    ports:
+      - "7233:7233"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  temporal-ui:
+    image: temporalio/ui:2.21
+    profiles: ["temporal"]
+    environment:
+      TEMPORAL_ADDRESS: temporal:7233
+    ports:
+      - "8081:8080"
+    depends_on:
+      - temporal
+
+  loki:
+    image: grafana/loki:2.9.0
+    restart: unless-stopped
+    volumes:
+      - ./deployments/loki/config.yaml:/etc/loki/local-config.yaml:ro
+      - loki_data:/loki
+    command: -config.file=/etc/loki/local-config.yaml
+
+  promtail:
+    image: grafana/promtail:2.9.0
+    restart: unless-stopped
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - /var/lib/docker/containers:/var/lib/docker/containers:ro
+      - ./deployments/promtail/config.yaml:/etc/promtail/config.yml:ro
+
+  prometheus:
+    image: prom/prometheus:v2.47.0
+    restart: unless-stopped
+    volumes:
+      - ./deployments/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+
+  grafana:
+    image: grafana/grafana:10.2.0
+    restart: unless-stopped
+    ports:
+      - "3001:3000"
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./deployments/grafana/provisioning:/etc/grafana/provisioning:ro
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_PASSWORD:-admin}
+    depends_on:
+      - loki
+      - prometheus
+
+volumes:
+  pg_data:
+  redis_data:
+  loki_data:
+  prometheus_data:
+  grafana_data:

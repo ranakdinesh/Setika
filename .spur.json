@@ -1,0 +1,18 @@
+{
+  "name": "setika",
+  "go_module": "y",
+  "protocols": [
+    "http",
+    "websocket",
+    "temporal",
+    "queue"
+  ],
+  "modules": [],
+  "protocol_ports": {
+    "http": "8080",
+    "temporal": "7233",
+    "websocket": "8080 (/ws)"
+  },
+  "created_at": "2026-06-09T23:11:56+05:30",
+  "spur_cli_version": "1.0.0"
+}

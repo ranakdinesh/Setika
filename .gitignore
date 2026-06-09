@@ -1,0 +1,24 @@
+.env
+*.env
+keys/
+*.pem
+*.key
+
+# Go
+*.exe
+*.test
+vendor/
+
+# Next.js
+ui/studio/.next/
+ui/studio/node_modules/
+ui/studio/out/
+
+# Docker volumes
+data/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+.DS_Store

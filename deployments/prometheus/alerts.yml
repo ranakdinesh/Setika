@@ -1,0 +1,41 @@
+groups:
+  - name: spur.critical
+    interval: 1m
+    rules:
+      - alert: HighErrorRate
+        expr: |
+          (sum(rate(spur_requests_total{status=~"5.."}[5m]))
+           / sum(rate(spur_requests_total[5m]))) > 0.05
+        for: 5m
+        labels: {severity: critical}
+        annotations:
+          summary: "Error rate above 5%"
+      - alert: DBPoolExhausted
+        expr: (spur_db_pool_acquired / (spur_db_pool_acquired + spur_db_pool_idle)) > 0.9
+        for: 2m
+        labels: {severity: critical}
+        annotations:
+          summary: "DB pool above 90%"
+      - alert: NoTraffic
+        expr: sum(rate(spur_requests_total[5m])) == 0
+        for: 5m
+        labels: {severity: critical}
+        annotations:
+          summary: "Zero traffic detected"
+  - name: spur.warning
+    interval: 2m
+    rules:
+      - alert: SlowResponses
+        expr: |
+          histogram_quantile(0.99,
+            sum(rate(spur_request_duration_seconds_bucket[5m])) by (le)) > 2
+        for: 5m
+        labels: {severity: warning}
+        annotations:
+          summary: "P99 latency above 2s"
+      - alert: AuthFailureSpike
+        expr: sum(rate(spur_auth_attempts_total{result="failed"}[5m])) > 10
+        for: 2m
+        labels: {severity: warning}
+        annotations:
+          summary: "High auth failure rate"
