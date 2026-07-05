@@ -1,7 +1,7 @@
 package websocket
 
 import (
-	"y/internal/logger"
+	"github.com/ranakdinesh/setika/internal/logger"
 )
 
 type Hub struct {

@@ -1,6 +1,7 @@
 package http
 
 import (
+	"context"
 	"time"
 
 	"go.opentelemetry.io/otel/trace"
@@ -24,6 +25,7 @@ type Options struct {
 	AllowedOrigins []string // nil => ["*"]
 	AllowedMethods []string // nil => GET,POST,PUT,PATCH,DELETE,OPTIONS
 	AllowedHeaders []string // nil => common headers
+	OriginAllowed  func(ctx context.Context, origin string) bool
 
 	// Security headers (on by default unless explicitly disabled)
 	EnableSecurityHeaders bool

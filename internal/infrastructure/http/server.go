@@ -8,7 +8,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
-	"y/internal/logger"
+	"github.com/ranakdinesh/setika/internal/logger"
 )
 
 // MountFunc lets parent apps add multiple routes at once.
@@ -50,7 +50,7 @@ func NewServer(opts Options, log *logger.Loggerx, initialMount MountFunc) *Serve
 		// r.Use(MaxBytes(opts.MaxBodyBytes)) // Assuming MaxBytes is defined
 	}
 	if opts.EnableCORS {
-		// r.Use(CORS(opts)) // Assuming CORS is defined
+		r.Use(CORS(opts))
 	}
 	if opts.EnableSecurityHeaders {
 		// r.Use(SecurityHeaders()) // Assuming SecurityHeaders is defined

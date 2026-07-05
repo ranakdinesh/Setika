@@ -5,18 +5,18 @@ import (
 	"fmt"
 
 	"github.com/jackc/pgx/v5/pgxpool"
-	"y/internal/config"
-	"y/internal/infrastructure/db"
-	"y/internal/infrastructure/grpc"
-	"y/internal/infrastructure/hls"
-	httpinfra "y/internal/infrastructure/http"
-	"y/internal/infrastructure/messaging"
-	"y/internal/infrastructure/redis"
-	"y/internal/infrastructure/rtmp"
-	"y/internal/infrastructure/sse"
-	"y/internal/infrastructure/temporal"
-	"y/internal/infrastructure/websocket"
-	"y/internal/logger"
+	"github.com/ranakdinesh/setika/internal/config"
+	"github.com/ranakdinesh/setika/internal/infrastructure/db"
+	"github.com/ranakdinesh/setika/internal/infrastructure/grpc"
+	"github.com/ranakdinesh/setika/internal/infrastructure/hls"
+	httpinfra "github.com/ranakdinesh/setika/internal/infrastructure/http"
+	"github.com/ranakdinesh/setika/internal/infrastructure/messaging"
+	"github.com/ranakdinesh/setika/internal/infrastructure/redis"
+	"github.com/ranakdinesh/setika/internal/infrastructure/rtmp"
+	"github.com/ranakdinesh/setika/internal/infrastructure/sse"
+	"github.com/ranakdinesh/setika/internal/infrastructure/temporal"
+	"github.com/ranakdinesh/setika/internal/infrastructure/websocket"
+	"github.com/ranakdinesh/setika/internal/logger"
 	goredis "github.com/redis/go-redis/v9"
 )
 
@@ -56,7 +56,17 @@ func Bootstrap(ctx context.Context, cfg *config.Config, log *logger.Loggerx) (*I
 
 	// HTTP (always on)
 	httpServer := httpinfra.NewServer(httpinfra.Options{
-		Addr: cfg.HTTPAddr,
+		Addr:                  cfg.HTTPAddr,
+		ReadTimeout:           cfg.ReadTimeout,
+		WriteTimeout:          cfg.WriteTimeout,
+		IdleTimeout:           cfg.IdleTimeout,
+		MaxBodyBytes:          cfg.MaxBodyBytes,
+		EnableCORS:            cfg.EnableCORS,
+		AllowedOrigins:        cfg.CORSAllowedOrigins,
+		AllowedMethods:        []string{"GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"},
+		AllowedHeaders:        []string{"Accept", "Authorization", "Content-Type", "X-Request-Id"},
+		OriginAllowed:         NewTenantOriginValidator(pool, cfg, log),
+		EnableSecurityHeaders: cfg.EnableSecurityHeaders,
 	}, log, nil)
 	log.Info(ctx).Str("addr", cfg.HTTPAddr).Msg("HTTP server ready")
 

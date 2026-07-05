@@ -15,47 +15,80 @@ import (
 )
 
 type Config struct {
-	AppEnv                string        `env:"APP_ENV" default:"development"`
-	OtelServiceName       string        `env:"OTEL_SERVICE_NAME" default:"oauth-service"`
-	OtelExporterEndpoint  string        `env:"OTEL_EXPORTER_OTLP_ENDPOINT"`
-	HTTPAddr              string        `env:"HTTP_ADDR" default:":8080"`
-	GRPCAddr              string        `env:"GRPC_ADDR" default:":9090"`
-	ReadTimeout           time.Duration `env:"HTTP_READ_TIMEOUT" default:"15s"`
-	WriteTimeout          time.Duration `env:"HTTP_WRITE_TIMEOUT" default:"30s"`
-	IdleTimeout           time.Duration `env:"HTTP_IDLE_TIMEOUT" default:"60s"`
-	MaxBodyBytes          int64         `env:"HTTP_MAX_BODY_BYTES" default:"10485760"`
-	EnableCORS            bool          `env:"HTTP_ENABLE_CORS" default:"true"`
-	EnableSecurityHeaders bool          `env:"HTTP_ENABLE_SECURITY_HEADERS" default:"true"`
-	CORSAllowedOrigins    []string      `env:"CORS_ALLOWED_ORIGINS" default:"*" split:","`
-	DatabaseURL           string        `env:"DATABASE_URL"`
-	OAuthIssuer           string        `env:"OAUTH_ISSUER"`
-	OAuthAudience         string        `env:"OAUTH_AUDIENCE"`
-	OAuthJWKSURL          string        `env:"OAUTH_JWKS_URL"`
-	APIKeyHeader          string        `env:"API_KEY_HEADER"`
-	APIKeyValue           string        `env:"API_KEY_VALUE"`
-	LogServiceURL         string        `env:"LOG_SVC_URL"`
-	LogServiceKey         string        `env:"LOG_SVC_API_KEY"`
-	JWTPrivateKeyPath     string        `env:"JWT_PRIVATE_KEY_PATH"`
-	TenantHeader          string        `env:"TENANT_HEADER"`
-	FositeGlobalSecret    string        `env:"FOSITE_GLOBAL_SECRET"`
-	AuthClientID          string        `env:"AUTH_CLIENT_ID" envDefault:""`
-	AuthClientSecret      string        `env:"AUTH_CLIENT_SECRET" envDefault:""`
-	AppName               string        `env:"APP_NAME" default:"spur"`
-	LogLevel              string        `env:"LOG_LEVEL" default:"info"`
-	FrontendURL           string        `env:"FRONTEND_URL" default:"http://localhost:3000"`
-	GRPCEnabled           bool          `env:"GRPC_ENABLED"    default:"false"`
-	WSEnabled             bool          `env:"WS_ENABLED"      default:"false"`
-	SSEEnabled            bool          `env:"SSE_ENABLED"     default:"false"`
-	HLSEnabled            bool          `env:"HLS_ENABLED"     default:"false"`
-	HLSAddr               string        `env:"HLS_ADDR"        default:":8888"`
-	HLSStoragePath        string        `env:"HLS_STORAGE_PATH" default:"./data/hls"`
-	RTMPEnabled           bool          `env:"RTMP_ENABLED"    default:"false"`
-	RTMPAddr              string        `env:"RTMP_ADDR"       default:":1935"`
-	RedisEnabled          bool          `env:"REDIS_ENABLED"   default:"false"`
-	RedisURL              string        `env:"REDIS_URL"       default:"redis://localhost:6379"`
-	DBMaxConns            int32         `env:"DB_MAX_CONNS"    default:"20"`
-	TemporalHost          string        `env:"TEMPORAL_HOST"`
-	TemporalNamespace     string        `env:"TEMPORAL_NAMESPACE" default:"default"`
+	AppEnv                     string        `env:"APP_ENV" default:"development"`
+	OtelServiceName            string        `env:"OTEL_SERVICE_NAME" default:"oauth-service"`
+	OtelExporterEndpoint       string        `env:"OTEL_EXPORTER_OTLP_ENDPOINT"`
+	HTTPAddr                   string        `env:"HTTP_ADDR" default:":8080"`
+	GRPCAddr                   string        `env:"GRPC_ADDR" default:":9090"`
+	ReadTimeout                time.Duration `env:"HTTP_READ_TIMEOUT" default:"15s"`
+	WriteTimeout               time.Duration `env:"HTTP_WRITE_TIMEOUT" default:"30s"`
+	IdleTimeout                time.Duration `env:"HTTP_IDLE_TIMEOUT" default:"60s"`
+	MaxBodyBytes               int64         `env:"HTTP_MAX_BODY_BYTES" default:"10485760"`
+	EnableCORS                 bool          `env:"HTTP_ENABLE_CORS" default:"true"`
+	EnableSecurityHeaders      bool          `env:"HTTP_ENABLE_SECURITY_HEADERS" default:"true"`
+	CORSAllowedOrigins         []string      `env:"CORS_ALLOWED_ORIGINS" default:"http://localhost:3000,http://localhost:3001,http://localhost:3002,http://localhost:3003,http://127.0.0.1:3000,https://dev.setika.one" split:","`
+	DatabaseURL                string        `env:"DATABASE_URL"`
+	OAuthIssuer                string        `env:"OAUTH_ISSUER"`
+	OAuthAudience              string        `env:"OAUTH_AUDIENCE"`
+	OAuthJWKSURL               string        `env:"OAUTH_JWKS_URL"`
+	APIKeyHeader               string        `env:"API_KEY_HEADER"`
+	APIKeyValue                string        `env:"API_KEY_VALUE"`
+	LogServiceURL              string        `env:"LOG_SVC_URL"`
+	LogServiceKey              string        `env:"LOG_SVC_API_KEY"`
+	JWTPrivateKeyPath          string        `env:"JWT_PRIVATE_KEY_PATH"`
+	TenantHeader               string        `env:"TENANT_HEADER"`
+	FositeGlobalSecret         string        `env:"FOSITE_GLOBAL_SECRET"`
+	IdentityBootstrapEmail     string        `env:"IDENTITY_BOOTSTRAP_EMAIL" default:"superadmin@sysops.local"`
+	IdentityBootstrapPassword  string        `env:"IDENTITY_BOOTSTRAP_PASSWORD"`
+	IdentityBootstrapFirstName string        `env:"IDENTITY_BOOTSTRAP_FIRST_NAME" default:"Super"`
+	IdentityBootstrapLastName  string        `env:"IDENTITY_BOOTSTRAP_LAST_NAME" default:"Admin"`
+	SetikaLoginSessionTTL      time.Duration `env:"SETIKA_LOGIN_SESSION_TTL" default:"4320h"`
+	AuthClientID               string        `env:"AUTH_CLIENT_ID" envDefault:""`
+	AuthClientSecret           string        `env:"AUTH_CLIENT_SECRET" envDefault:""`
+	AppName                    string        `env:"APP_NAME" default:"spur"`
+	LogLevel                   string        `env:"LOG_LEVEL" default:"info"`
+	FrontendURL                string        `env:"FRONTEND_URL" default:"http://localhost:3000"`
+	TenantBaseDomain           string        `env:"TENANT_BASE_DOMAIN" default:"dev.setika.one"`
+	EmailProvider              string        `env:"EMAIL_PROVIDER" default:"smtp"`
+	EmailFromEmail             string        `env:"EMAIL_FROM_EMAIL"`
+	EmailFromName              string        `env:"EMAIL_FROM_NAME" default:"Setika"`
+	EmailReplyToEmail          string        `env:"EMAIL_REPLY_TO_EMAIL"`
+	SMTPHost                   string        `env:"SMTP_HOST"`
+	SMTPPort                   int           `env:"SMTP_PORT" default:"587"`
+	SMTPUsername               string        `env:"SMTP_USERNAME"`
+	SMTPPassword               string        `env:"SMTP_PASSWORD"`
+	SMTPEncryption             string        `env:"SMTP_ENCRYPTION" default:"starttls"`
+	SMTPFromEmail              string        `env:"SMTP_FROM_EMAIL"`
+	SMTPFromName               string        `env:"SMTP_FROM_NAME" default:"Setika"`
+	SendGridAPIKey             string        `env:"SENDGRID_API_KEY"`
+	SendGridSandboxMode        bool          `env:"SENDGRID_SANDBOX_MODE" default:"false"`
+	EmailWebhookSigningSecret  string        `env:"EMAIL_WEBHOOK_SIGNING_SECRET"`
+	StorageProvider            string        `env:"STORAGE_PROVIDER" default:"minio"`
+	StorageEnabled             bool          `env:"STORAGE_ENABLED" default:"false"`
+	StorageBucket              string        `env:"STORAGE_BUCKET"`
+	StorageRegion              string        `env:"STORAGE_REGION"`
+	StorageEndpoint            string        `env:"STORAGE_ENDPOINT"`
+	StorageAccessKeyID         string        `env:"STORAGE_ACCESS_KEY_ID"`
+	StorageSecretAccessKey     string        `env:"STORAGE_SECRET_ACCESS_KEY"`
+	StorageUseSSL              bool          `env:"STORAGE_USE_SSL" default:"false"`
+	StorageForcePathStyle      bool          `env:"STORAGE_FORCE_PATH_STYLE" default:"true"`
+	StorageObjectPrefix        string        `env:"STORAGE_OBJECT_PREFIX"`
+	StoragePublicBaseURL       string        `env:"STORAGE_PUBLIC_BASE_URL"`
+	StorageMaxFileSizeBytes    int64         `env:"STORAGE_MAX_FILE_SIZE_BYTES" default:"10485760"`
+	StorageAllowedContentTypes string        `env:"STORAGE_ALLOWED_CONTENT_TYPES"`
+	GRPCEnabled                bool          `env:"GRPC_ENABLED"    default:"false"`
+	WSEnabled                  bool          `env:"WS_ENABLED"      default:"false"`
+	SSEEnabled                 bool          `env:"SSE_ENABLED"     default:"false"`
+	HLSEnabled                 bool          `env:"HLS_ENABLED"     default:"false"`
+	HLSAddr                    string        `env:"HLS_ADDR"        default:":8888"`
+	HLSStoragePath             string        `env:"HLS_STORAGE_PATH" default:"./data/hls"`
+	RTMPEnabled                bool          `env:"RTMP_ENABLED"    default:"false"`
+	RTMPAddr                   string        `env:"RTMP_ADDR"       default:":1935"`
+	RedisEnabled               bool          `env:"REDIS_ENABLED"   default:"false"`
+	RedisURL                   string        `env:"REDIS_URL"       default:"redis://localhost:6379"`
+	DBMaxConns                 int32         `env:"DB_MAX_CONNS"    default:"20"`
+	TemporalHost               string        `env:"TEMPORAL_HOST"`
+	TemporalNamespace          string        `env:"TEMPORAL_NAMESPACE" default:"default"`
 
 	IdentityIssuer string `env:"IDENTITY_ISSUER"      envDefault:"http://localhost:8080"`
 }

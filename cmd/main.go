@@ -7,7 +7,7 @@ import (
 	"os/signal"
 	"syscall"
 
-	"y/internal/app"
+	"github.com/ranakdinesh/setika/internal/app"
 )
 
 func main() {

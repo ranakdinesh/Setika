@@ -9,8 +9,8 @@ import (
 	"strings"
 	"time"
 
-	//	"y/internal/adapters/db"
-	//	"y/internal/adapters/db/sqlc"
+	//	"github.com/ranakdinesh/setika/internal/adapters/db"
+	//	"github.com/ranakdinesh/setika/internal/adapters/db/sqlc"
 	"github.com/rs/zerolog"
 )
 

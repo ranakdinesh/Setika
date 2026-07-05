@@ -6,7 +6,7 @@ import (
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
-	"y/internal/infrastructure/rls"
+	"github.com/ranakdinesh/setika/internal/infrastructure/rls"
 )
 
 // txContextKey is the unique key for storing the transaction in context

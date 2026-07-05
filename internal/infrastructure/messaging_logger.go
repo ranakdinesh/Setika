@@ -3,8 +3,8 @@ package infrastructure
 import (
 	"context"
 
-	"y/internal/infrastructure/messaging"
-	"y/internal/logger"
+	"github.com/ranakdinesh/setika/internal/infrastructure/messaging"
+	"github.com/ranakdinesh/setika/internal/logger"
 )
 
 type messagingLogger struct {

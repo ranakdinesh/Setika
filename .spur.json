@@ -1,13 +1,15 @@
 {
   "name": "setika",
-  "go_module": "y",
+  "go_module": "github.com/ranakdinesh/setika",
   "protocols": [
     "http",
     "websocket",
     "temporal",
     "queue"
   ],
-  "modules": [],
+  "modules": [
+    "identity"
+  ],
   "protocol_ports": {
     "http": "8080",
     "temporal": "7233",

@@ -4,7 +4,7 @@ import (
 	"context"
 	"net/http"
 	"sync"
-	// "y/internal/logger"
+	// "github.com/ranakdinesh/setika/internal/logger"
 )
 
 // PermissionResolver defines how we fetch permissions from the DB (if not in cache)

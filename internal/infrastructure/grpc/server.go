@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"net"
 
-	"y/internal/logger"
+	"github.com/ranakdinesh/setika/internal/logger"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/reflection"
 )

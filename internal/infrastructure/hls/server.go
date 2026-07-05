@@ -3,7 +3,7 @@ package hls
 import (
 	"context"
 
-	"y/internal/logger"
+	"github.com/ranakdinesh/setika/internal/logger"
 )
 
 type Server struct {
