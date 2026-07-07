@@ -64,7 +64,20 @@ restore_if_exists "frontend/.env.local"
 docker compose -p "$PROJECT_NAME" -f "$COMPOSE_FILE" up -d --build
 docker compose -p "$PROJECT_NAME" -f "$COMPOSE_FILE" ps
 
-curl -fsS http://127.0.0.1:${DOCKER_BACKEND_PORT:-8087}/healthz >/dev/null
-curl -fsS http://127.0.0.1:${DOCKER_FRONTEND_PORT:-3003}/ >/dev/null
+wait_for_url() {
+  local url="$1"
+  local label="$2"
+  for attempt in $(seq 1 60); do
+    if curl -fsS "$url" >/dev/null; then
+      return 0
+    fi
+    sleep 2
+  done
+  echo "$label did not become healthy at $url" >&2
+  return 1
+}
+
+wait_for_url "http://127.0.0.1:${DOCKER_BACKEND_PORT:-8087}/healthz" "backend"
+wait_for_url "http://127.0.0.1:${DOCKER_FRONTEND_PORT:-3003}/" "frontend"
 
 echo "Setika dev deploy completed from $BRANCH at $timestamp"
