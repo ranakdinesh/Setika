@@ -68,7 +68,7 @@ wait_for_url() {
   local url="$1"
   local label="$2"
   for attempt in $(seq 1 60); do
-    if curl -fsS "$url" >/dev/null; then
+    if curl -fsS "$url" >/dev/null 2>&1; then
       return 0
     fi
     sleep 2
