@@ -11,41 +11,51 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"net/mail"
 	"strings"
 	"time"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
-	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
-	hrms "github.com/ranakdinesh/setika-hrms"
-	hrmsdomain "github.com/ranakdinesh/setika-hrms/core/domain"
-	hrmsports "github.com/ranakdinesh/setika-hrms/core/ports"
 	identityadapter "github.com/ranakdinesh/setika/internal/adapters/identity"
 	"github.com/ranakdinesh/setika/internal/logger"
+	hrms "github.com/ranakdinesh/spur-hrms"
+	hrmsdomain "github.com/ranakdinesh/spur-hrms/core/domain"
+	hrmsports "github.com/ranakdinesh/spur-hrms/core/ports"
 	identity "github.com/ranakdinesh/spur-identity"
+	goredis "github.com/redis/go-redis/v9"
+	"golang.org/x/crypto/bcrypt"
 )
 
 type Handler struct {
 	identity         *identity.Module
 	hrms             *hrms.Module
+	communication    identity.CommunicationPort
 	db               *pgxpool.Pool
+	redis            *goredis.Client
 	log              *logger.Loggerx
 	privateKey       *rsa.PrivateKey
 	identityIssuer   string
 	loginSessionTTL  time.Duration
 	tenantBaseDomain string
+	frontendURL      string
+	signupAlertEmail string
 }
 
 type Options struct {
 	Identity         *identity.Module
 	Hrms             *hrms.Module
+	Communication    identity.CommunicationPort
 	DB               *pgxpool.Pool
+	Redis            *goredis.Client
 	Log              *logger.Loggerx
 	PrivateKey       *rsa.PrivateKey
 	IdentityIssuer   string
 	LoginSessionTTL  time.Duration
 	TenantBaseDomain string
+	FrontendURL      string
+	SignupAlertEmail string
 }
 
 func New(opts Options) *Handler {
@@ -60,12 +70,16 @@ func New(opts Options) *Handler {
 	return &Handler{
 		identity:         opts.Identity,
 		hrms:             opts.Hrms,
+		communication:    opts.Communication,
 		db:               opts.DB,
+		redis:            opts.Redis,
 		log:              opts.Log,
 		privateKey:       opts.PrivateKey,
 		identityIssuer:   opts.IdentityIssuer,
 		loginSessionTTL:  loginSessionTTL,
 		tenantBaseDomain: tenantBaseDomain,
+		frontendURL:      strings.TrimRight(strings.TrimSpace(opts.FrontendURL), "/"),
+		signupAlertEmail: strings.TrimSpace(opts.SignupAlertEmail),
 	}
 }
 
@@ -88,6 +102,29 @@ type signupResponse struct {
 	MobileActivationCode string `json:"mobile_activation_code"`
 	Message              string `json:"message"`
 	RequiresVerification bool   `json:"requires_email_verification"`
+	Status               string `json:"status,omitempty"`
+}
+
+type signupSubdomainAvailabilityResponse struct {
+	Subdomain string `json:"subdomain"`
+	Available bool   `json:"available"`
+	Message   string `json:"message"`
+}
+
+type signupVerifyResponse struct {
+	AccessToken          string `json:"access_token"`
+	RefreshToken         string `json:"refresh_token"`
+	TokenType            string `json:"token_type"`
+	ExpiresIn            int    `json:"expires_in"`
+	DefaultModule        string `json:"default_module,omitempty"`
+	TenantID             string `json:"tenant_id"`
+	UserID               string `json:"user_id"`
+	Subdomain            string `json:"subdomain"`
+	TenantURL            string `json:"tenant_url"`
+	PlanCode             string `json:"plan_code"`
+	Message              string `json:"message"`
+	Status               string `json:"status"`
+	RequiresVerification bool   `json:"requires_email_verification"`
 }
 
 type identityRegisterResponse struct {
@@ -106,19 +143,57 @@ func (h *Handler) Signup(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "invalid request body")
 		return
 	}
-	resp, err := h.registerTenantSignup(r.Context(), req)
+	resp, err := h.createSignupIntent(r.Context(), req, clientIPAddress(r))
 	if err != nil {
-		h.logSignupError(r.Context(), "register tenant signup", err)
+		h.logSignupError(r.Context(), "create signup intent", err)
+		status := http.StatusBadRequest
+		if errors.Is(err, errSignupRateLimited) {
+			status = http.StatusTooManyRequests
+		}
+		writeError(w, status, err.Error())
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusAccepted)
+	json.NewEncoder(w).Encode(resp)
+}
+
+func (h *Handler) VerifySignup(w http.ResponseWriter, r *http.Request) {
+	token := strings.TrimSpace(r.URL.Query().Get("token"))
+	if token == "" {
+		writeError(w, http.StatusBadRequest, "verification token is required")
+		return
+	}
+	resp, err := h.verifySignupIntent(r.Context(), token)
+	if err != nil {
+		h.logSignupError(r.Context(), "verify signup intent", err)
 		writeError(w, http.StatusBadRequest, err.Error())
 		return
 	}
 	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusCreated)
 	json.NewEncoder(w).Encode(resp)
 }
 
-func (h *Handler) registerTenantSignup(ctx context.Context, req signupRequest) (*signupResponse, error) {
-	if h == nil || h.identity == nil || h.hrms == nil {
+func (h *Handler) SignupSubdomainAvailability(w http.ResponseWriter, r *http.Request) {
+	subdomain := hrmsdomain.NormalizeSubdomain(r.URL.Query().Get("subdomain"))
+	resp := signupSubdomainAvailabilityResponse{
+		Subdomain: subdomain,
+		Available: false,
+	}
+	if subdomain == "" {
+		resp.Message = "workspace address is required"
+	} else if err := h.validateRequestedSignupSubdomain(r.Context(), subdomain); err != nil {
+		resp.Message = err.Error()
+	} else {
+		resp.Available = true
+		resp.Message = "workspace address is available"
+	}
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(resp)
+}
+
+func (h *Handler) createSignupIntent(ctx context.Context, req signupRequest, clientIP string) (*signupResponse, error) {
+	if h == nil || h.identity == nil || h.hrms == nil || h.db == nil {
 		err := errors.New("signup is not configured")
 		h.logSignupError(ctx, "validate signup dependencies", err)
 		return nil, err
@@ -126,107 +201,177 @@ func (h *Handler) registerTenantSignup(ctx context.Context, req signupRequest) (
 	req.FirstName = strings.TrimSpace(req.FirstName)
 	req.LastName = strings.TrimSpace(req.LastName)
 	req.Email = strings.TrimSpace(strings.ToLower(req.Email))
-	req.Mobile = strings.TrimSpace(req.Mobile)
+	req.Mobile = normalizeAssistedProvisionMobile(req.Mobile)
 	req.CompanyName = strings.TrimSpace(req.CompanyName)
 	req.Subdomain = hrmsdomain.NormalizeSubdomain(req.Subdomain)
-	if req.FirstName == "" || req.LastName == "" || req.Email == "" || req.Mobile == "" || req.CompanyName == "" || req.Subdomain == "" || req.Password == "" {
-		err := errors.New("first name, last name, email, mobile, company, subdomain, and password are required")
+	if req.FirstName == "" || req.LastName == "" || req.Email == "" || req.Mobile == "" || req.CompanyName == "" || req.Password == "" || req.Subdomain == "" {
+		err := errors.New("first name, last name, email, mobile, company, workspace address, and password are required")
 		h.logSignupError(ctx, "validate signup request", err)
 		return nil, err
 	}
-	if err := h.hrms.Services.Hrms.RunAsSystem(ctx, func(systemCtx context.Context) error {
-		if _, err := h.hrms.Services.Hrms.ResolveTenantBySubdomain(systemCtx, req.Subdomain); err == nil {
-			return errors.New("subdomain is already taken")
-		} else if !errors.Is(err, pgx.ErrNoRows) {
-			return fmt.Errorf("check subdomain availability: %w", err)
-		}
-		return nil
+	if _, err := mail.ParseAddress(req.Email); err != nil {
+		return nil, errors.New("email is invalid")
+	}
+	if len(req.Password) < assistedProvisionTempPasswordMin {
+		return nil, fmt.Errorf("password must be at least %d characters", assistedProvisionTempPasswordMin)
+	}
+	if err := h.enforceSignupRateLimits(ctx, signupRateLimitSubject{
+		IP:        clientIP,
+		Email:     req.Email,
+		Mobile:    req.Mobile,
+		Subdomain: req.Subdomain,
 	}); err != nil {
-		h.logSignupError(ctx, "check signup availability", err)
+		return nil, err
+	}
+	if err := h.ensureSignupAccountAvailable(ctx, req.Email, req.Mobile); err != nil {
+		return nil, err
+	}
+	if err := h.validateRequestedSignupSubdomain(ctx, req.Subdomain); err != nil {
 		return nil, err
 	}
 
-	registered, err := h.registerIdentityTenant(ctx, req)
+	passwordHash, err := bcrypt.GenerateFromPassword([]byte(req.Password), 14)
 	if err != nil {
-		err = fmt.Errorf("create identity tenant: %w", err)
-		h.logSignupError(ctx, "create identity tenant", err)
 		return nil, err
 	}
-	tenantID, err := uuid.Parse(registered.Tenant.ID)
+	token, err := generateSignupToken()
 	if err != nil {
-		err = fmt.Errorf("identity returned invalid tenant id: %w", err)
-		h.logSignupError(ctx, "parse identity tenant id", err)
 		return nil, err
 	}
-	userID, err := uuid.Parse(registered.User.ID)
-	if err != nil {
-		err = fmt.Errorf("identity returned invalid user id: %w", err)
-		h.logSignupError(ctx, "parse identity user id", err)
+	tokenHash := hashSignupToken(token)
+	expiresAt := signupTokenExpiry()
+	intentID := uuid.New()
+	if _, err := h.db.Exec(ctx, `
+		UPDATE platform.signup_intents
+		SET status = 'cancelled', updated_at = NOW()
+		WHERE status = 'pending_email_verification'
+		  AND (lower(email) = lower($1) OR mobile = $2)
+	`, req.Email, req.Mobile); err != nil {
+		return nil, fmt.Errorf("cancel previous signup intent: %w", err)
+	}
+	if _, err := h.db.Exec(ctx, `
+		INSERT INTO platform.signup_intents (
+			id, first_name, last_name, email, mobile, password_hash, company_name, subdomain,
+			country, timezone, trial_days, status, verification_token_hash, verification_sent_at, expires_at
+		) VALUES (
+			$1, $2, $3, $4, $5, $6, $7, $8,
+			'IN', 'Asia/Kolkata', $9, 'pending_email_verification', $10, NOW(), $11
+		)
+	`, intentID, req.FirstName, req.LastName, req.Email, req.Mobile, string(passwordHash), req.CompanyName, req.Subdomain, defaultAssistedProvisionTrialDays, tokenHash, expiresAt); err != nil {
+		return nil, fmt.Errorf("create signup intent: %w", err)
+	}
+	emailIntent := signupIntentEmail{
+		ID: intentID, FirstName: req.FirstName, LastName: req.LastName, Email: req.Email, Token: token,
+	}
+	if err := h.sendSignupVerificationEmail(ctx, emailIntent); err != nil {
 		return nil, err
 	}
-	if err := h.assignBaselineEmployeeRole(ctx, tenantID, userID); err != nil {
-		err = fmt.Errorf("assign baseline employee role: %w", err)
-		h.logSignupError(ctx, "assign baseline employee role", err)
-		return nil, err
-	}
+	h.notifySuperAdminsOfSignupIntent(ctx, emailIntent, req.CompanyName, req.Mobile, req.Subdomain)
 
-	code, err := generateActivationCode(req.Subdomain)
-	if err != nil {
-		h.logSignupError(ctx, "generate activation code", err)
-		return nil, err
-	}
-	displayName := req.CompanyName
-	var profileSubdomain string
-	var activationCode string
-	if err := h.hrms.Services.Hrms.RunAsSystem(ctx, func(systemCtx context.Context) error {
-		profile, err := h.hrms.Services.Hrms.UpsertTenantProfile(systemCtx, hrmsports.UpsertTenantProfileCmd{
-			TenantID:             tenantID,
-			Subdomain:            req.Subdomain,
-			MobileActivationCode: code,
-			DisplayName:          &displayName,
-		})
-		if err != nil {
-			return fmt.Errorf("create hrms tenant profile: %w", err)
-		}
-		profileSubdomain = profile.Subdomain
-		activationCode = profile.MobileActivationCode
-
-		if _, err := h.hrms.Services.Hrms.UpsertTenantSetting(systemCtx, hrmsports.UpsertTenantSettingCmd{
-			TenantID: tenantID,
-			Key:      "theme",
-			Value: map[string]any{
-				"primaryColor": "#588368",
-				"mode":         "light",
-			},
-		}); err != nil {
-			return fmt.Errorf("create default theme: %w", err)
-		}
-		if _, err := h.hrms.Services.Hrms.UpsertTenantSetting(systemCtx, hrmsports.UpsertTenantSettingCmd{
-			TenantID: tenantID,
-			Key:      "company",
-			Value: map[string]any{
-				"name":      req.CompanyName,
-				"employees": req.Employees,
-			},
-		}); err != nil {
-			return fmt.Errorf("create company settings: %w", err)
-		}
-
-		return nil
-	}); err != nil {
-		h.logSignupError(ctx, "provision hrms tenant", err)
-		return nil, err
-	}
-
-	tenantURL := h.tenantHost(profileSubdomain)
 	return &signupResponse{
-		TenantID:             registered.Tenant.ID,
-		UserID:               userID.String(),
-		Subdomain:            profileSubdomain,
-		TenantURL:            "https://" + tenantURL,
-		MobileActivationCode: activationCode,
-		Message:              "Signup created successfully. Please verify your email address before logging in.",
+		Subdomain:            req.Subdomain,
+		TenantURL:            "https://" + h.tenantHost(req.Subdomain),
+		Message:              "Check your email to verify your account. Your 30-day Setika trial starts after verification.",
 		RequiresVerification: true,
+		Status:               "pending_email_verification",
+	}, nil
+}
+
+type signupIntent struct {
+	ID           uuid.UUID
+	FirstName    string
+	LastName     string
+	Email        string
+	Mobile       string
+	PasswordHash string
+	CompanyName  string
+	Subdomain    string
+	Country      string
+	Timezone     string
+	TrialDays    int32
+}
+
+type signupIntentEmail struct {
+	ID        uuid.UUID
+	FirstName string
+	LastName  string
+	Email     string
+	Token     string
+}
+
+func (h *Handler) verifySignupIntent(ctx context.Context, token string) (*signupVerifyResponse, error) {
+	if h == nil || h.db == nil || h.hrms == nil || h.identity == nil {
+		return nil, errors.New("signup verification is not configured")
+	}
+	intent, err := h.loadPendingSignupIntent(ctx, hashSignupToken(token))
+	if err != nil {
+		return nil, err
+	}
+	planID, planCode, err := h.defaultPublicTrialPlan(ctx)
+	if err != nil {
+		return nil, err
+	}
+	identityVerificationToken, err := generateSignupToken()
+	if err != nil {
+		return nil, err
+	}
+	input := assistedProvisionInput{
+		CompanyName:         intent.CompanyName,
+		LegalName:           intent.CompanyName,
+		Subdomain:           intent.Subdomain,
+		EmployeeEstimate:    0,
+		Country:             intent.Country,
+		Timezone:            intent.Timezone,
+		AdminFirstName:      intent.FirstName,
+		AdminLastName:       intent.LastName,
+		AdminEmail:          intent.Email,
+		AdminMobile:         intent.Mobile,
+		PlanID:              planID,
+		TrialDays:           intent.TrialDays,
+		BillingMode:         "manual_billing",
+		PaymentMethodStatus: "manual_billing",
+		SendInvite:          false,
+	}
+	result, err := h.provisionVerifiedSignupTenant(ctx, input, intent.PasswordHash, hashSignupToken(identityVerificationToken))
+	if err != nil {
+		return nil, err
+	}
+	if _, err := h.db.Exec(ctx, `
+		UPDATE platform.signup_intents
+		SET status = 'provisioned',
+			email_verified_at = COALESCE(email_verified_at, NOW()),
+			provisioned_tenant_id = $2,
+			provisioned_user_id = $3,
+			provisioned_subscription_id = $4,
+			updated_at = NOW()
+		WHERE id = $1
+	`, intent.ID, result.TenantID, result.AdminUserID, result.SubscriptionID); err != nil {
+		return nil, fmt.Errorf("mark signup intent provisioned: %w", err)
+	}
+	h.sendSignupWelcomeEmail(ctx, intent, result)
+	login, err := h.verifyIdentityEmailTokenThroughRoute(ctx, identityVerificationToken)
+	if err != nil {
+		return nil, err
+	}
+	accessToken, expiresIn, err := h.extendAccessToken(login.AccessToken)
+	if err != nil {
+		return nil, err
+	}
+
+	return &signupVerifyResponse{
+		AccessToken:          accessToken,
+		RefreshToken:         login.RefreshToken,
+		TokenType:            firstNonEmptyString(login.TokenType, "Bearer"),
+		ExpiresIn:            expiresIn,
+		DefaultModule:        firstNonEmptyString(login.DefaultModule, "/dashboard"),
+		TenantID:             result.TenantID.String(),
+		UserID:               result.AdminUserID.String(),
+		Subdomain:            result.Subdomain,
+		TenantURL:            result.TenantURL,
+		PlanCode:             planCode,
+		Message:              "Email verified. Your Setika trial workspace is ready.",
+		Status:               "verified",
+		RequiresVerification: false,
 	}, nil
 }
 

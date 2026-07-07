@@ -15,7 +15,7 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"
-	hrmsdomain "github.com/ranakdinesh/setika-hrms/core/domain"
+	hrmsdomain "github.com/ranakdinesh/spur-hrms/core/domain"
 )
 
 type loginRequest struct {
@@ -33,6 +33,7 @@ type identityLoginResponse struct {
 	PasswordMigrationRequired    bool   `json:"password_migration_required,omitempty"`
 	PasswordMigrationMessage     string `json:"password_migration_message,omitempty"`
 	LegacyPasswordMigrationError string `json:"legacy_password_migration_error,omitempty"`
+	DefaultModule                string `json:"default_module,omitempty"`
 }
 
 func (h *Handler) Login(w http.ResponseWriter, r *http.Request) {

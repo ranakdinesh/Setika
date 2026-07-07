@@ -36,6 +36,31 @@ type sendGridIdentityCommunication struct {
 	log         *logger.Loggerx
 }
 
+type SignupAlertMessage struct {
+	FirstName   string
+	LastName    string
+	Email       string
+	Mobile      string
+	CompanyName string
+	Subdomain   string
+	TenantURL   string
+	AdminURL    string
+}
+
+type SignupWelcomeMessage struct {
+	FirstName   string
+	Email       string
+	CompanyName string
+	TenantURL   string
+	PlanCode    string
+	TrialEndsAt string
+}
+
+type SetikaNotificationSender interface {
+	SendSignupAlert(ctx context.Context, recipients []string, message SignupAlertMessage) error
+	SendSignupWelcome(ctx context.Context, message SignupWelcomeMessage) error
+}
+
 func New(cfg config.Config, log *logger.Loggerx) identity.CommunicationPort {
 	provider := strings.ToLower(strings.TrimSpace(cfg.EmailProvider))
 	if provider == "" {
@@ -101,6 +126,29 @@ func (c *consoleIdentityCommunication) SendEmailVerification(ctx context.Context
 	return nil
 }
 
+func (c *consoleIdentityCommunication) SendSignupAlert(ctx context.Context, recipients []string, message SignupAlertMessage) error {
+	if c.log != nil {
+		c.log.Warn(ctx).
+			Strs("recipients", recipients).
+			Str("company", message.CompanyName).
+			Str("email", message.Email).
+			Str("tenant_url", message.TenantURL).
+			Msg("email provider not configured: signup alert logged for development")
+	}
+	return nil
+}
+
+func (c *consoleIdentityCommunication) SendSignupWelcome(ctx context.Context, message SignupWelcomeMessage) error {
+	if c.log != nil {
+		c.log.Warn(ctx).
+			Str("recipient", message.Email).
+			Str("company", message.CompanyName).
+			Str("tenant_url", message.TenantURL).
+			Msg("email provider not configured: signup welcome logged for development")
+	}
+	return nil
+}
+
 func (s *smtpIdentityCommunication) SendOTP(ctx context.Context, recipient string, channel string, code string) error {
 	if channel != "email" {
 		if s.log != nil {
@@ -114,6 +162,25 @@ func (s *smtpIdentityCommunication) SendOTP(ctx context.Context, recipient strin
 func (s *smtpIdentityCommunication) SendEmailVerification(ctx context.Context, message identity.EmailVerificationMessage) error {
 	subject, htmlBody, textBody := verificationEmailContent(message)
 	return s.sendEmail(ctx, message.Recipient, subject, htmlBody, textBody)
+}
+
+func (s *smtpIdentityCommunication) SendSignupAlert(ctx context.Context, recipients []string, message SignupAlertMessage) error {
+	subject, htmlBody, textBody := signupAlertEmailContent(message)
+	for _, recipient := range recipients {
+		recipient = strings.TrimSpace(recipient)
+		if recipient == "" {
+			continue
+		}
+		if err := s.sendEmail(ctx, recipient, subject, htmlBody, textBody); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (s *smtpIdentityCommunication) SendSignupWelcome(ctx context.Context, message SignupWelcomeMessage) error {
+	subject, htmlBody, textBody := signupWelcomeEmailContent(message)
+	return s.sendEmail(ctx, message.Email, subject, htmlBody, textBody)
 }
 
 func (s *sendGridIdentityCommunication) SendOTP(ctx context.Context, recipient string, channel string, code string) error {
@@ -131,6 +198,25 @@ func (s *sendGridIdentityCommunication) SendEmailVerification(ctx context.Contex
 	return s.sendEmail(ctx, message.Recipient, subject, htmlBody, textBody)
 }
 
+func (s *sendGridIdentityCommunication) SendSignupAlert(ctx context.Context, recipients []string, message SignupAlertMessage) error {
+	subject, htmlBody, textBody := signupAlertEmailContent(message)
+	for _, recipient := range recipients {
+		recipient = strings.TrimSpace(recipient)
+		if recipient == "" {
+			continue
+		}
+		if err := s.sendEmail(ctx, recipient, subject, htmlBody, textBody); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (s *sendGridIdentityCommunication) SendSignupWelcome(ctx context.Context, message SignupWelcomeMessage) error {
+	subject, htmlBody, textBody := signupWelcomeEmailContent(message)
+	return s.sendEmail(ctx, message.Email, subject, htmlBody, textBody)
+}
+
 func verificationEmailContent(message identity.EmailVerificationMessage) (string, string, string) {
 	name := strings.TrimSpace(message.FirstName)
 	if name == "" {
@@ -138,13 +224,139 @@ func verificationEmailContent(message identity.EmailVerificationMessage) (string
 	}
 	escapedName := html.EscapeString(name)
 	escapedURL := html.EscapeString(message.VerificationURL)
+	logoURL := html.EscapeString(verificationEmailLogoURL(message.VerificationURL))
+	preheader := "Verify your email to activate your Setika trial workspace."
 	htmlBody := fmt.Sprintf(
-		`<p>Hello %s,</p><p>Please verify your email address to activate your Setika account.</p><p><a href="%s">Verify email</a></p><p>If you did not request this account, you can ignore this email.</p>`,
+		`<!doctype html>
+<html>
+  <body style="margin:0;background:#f6f4ec;font-family:'Plus Jakarta Sans','Segoe UI',Arial,sans-serif;color:#172033;">
+    <span style="display:none!important;visibility:hidden;opacity:0;height:0;width:0;overflow:hidden;">%s</span>
+    <table role="presentation" width="100%%" cellspacing="0" cellpadding="0" style="background:#f6f4ec;padding:32px 16px;">
+      <tr>
+        <td align="center">
+          <table role="presentation" width="100%%" cellspacing="0" cellpadding="0" style="max-width:560px;background:#ffffff;border:1px solid #e6eadf;border-radius:18px;overflow:hidden;">
+            <tr>
+              <td style="background:#588368;padding:26px 30px;color:#ffffff;">
+                <div style="display:flex;align-items:center;gap:12px;">
+                  <img src="%s" width="145" height="37" alt="Setika" style="display:block;height:37px;width:145px;max-width:145px;background:#ffffff;border-radius:10px;padding:8px;" />
+                </div>
+                <h1 style="margin:10px 0 0;font-size:28px;line-height:1.2;font-weight:800;">Activate your HR workspace</h1>
+              </td>
+            </tr>
+            <tr>
+              <td style="padding:30px;">
+                <p style="margin:0 0 16px;font-size:16px;line-height:1.6;">Hello %s,</p>
+                <p style="margin:0 0 22px;font-size:16px;line-height:1.6;color:#4b5563;">Verify your email address to start your Setika 30-day trial. Your tenant workspace will be created after verification.</p>
+                <a href="%s" style="display:inline-block;background:#e87839;color:#ffffff;text-decoration:none;border-radius:12px;padding:14px 22px;font-weight:800;font-size:15px;">Verify email and create workspace</a>
+                <p style="margin:24px 0 0;font-size:13px;line-height:1.6;color:#6b7280;">If the button does not work, open this link:<br><a href="%s" style="word-break:break-all;color:#588368;text-decoration:underline;">%s</a></p>
+                <p style="margin:22px 0 0;font-size:13px;line-height:1.6;color:#6b7280;">If you did not request this Setika trial, you can ignore this email.</p>
+              </td>
+            </tr>
+          </table>
+        </td>
+      </tr>
+    </table>
+  </body>
+</html>`,
+		preheader,
+		logoURL,
 		escapedName,
 		escapedURL,
+		escapedURL,
+		escapedURL,
 	)
-	textBody := fmt.Sprintf("Hello %s,\n\nPlease verify your email address to activate your Setika account:\n%s\n\nIf you did not request this account, you can ignore this email.", name, message.VerificationURL)
+	textBody := fmt.Sprintf("Hello %s,\n\nVerify your email address to start your Setika 30-day trial and create your tenant workspace:\n%s\n\nIf you did not request this Setika trial, you can ignore this email.", name, message.VerificationURL)
 	return "Verify your Setika email address", htmlBody, textBody
+}
+
+func signupAlertEmailContent(message SignupAlertMessage) (string, string, string) {
+	fullName := strings.TrimSpace(message.FirstName + " " + message.LastName)
+	if fullName == "" {
+		fullName = "Customer"
+	}
+	escapedCompany := html.EscapeString(message.CompanyName)
+	escapedName := html.EscapeString(fullName)
+	escapedEmail := html.EscapeString(message.Email)
+	escapedMobile := html.EscapeString(message.Mobile)
+	escapedTenantURL := html.EscapeString(message.TenantURL)
+	escapedAdminURL := html.EscapeString(message.AdminURL)
+	htmlBody := fmt.Sprintf(`<!doctype html>
+<html>
+  <body style="margin:0;background:#f6f4ec;font-family:'Plus Jakarta Sans','Segoe UI',Arial,sans-serif;color:#172033;">
+    <table role="presentation" width="100%%" cellspacing="0" cellpadding="0" style="background:#f6f4ec;padding:28px 16px;">
+      <tr><td align="center">
+        <table role="presentation" width="100%%" cellspacing="0" cellpadding="0" style="max-width:560px;background:#ffffff;border:1px solid #e6eadf;border-radius:18px;overflow:hidden;">
+          <tr><td style="background:#588368;padding:24px 28px;color:#ffffff;"><img src="https://www.setika.one/assets/img/logo.png" width="138" alt="Setika" style="display:block;background:#ffffff;border-radius:10px;padding:8px;" /><h1 style="margin:16px 0 0;font-size:24px;line-height:1.25;">New signup request</h1></td></tr>
+          <tr><td style="padding:28px;">
+            <p style="margin:0 0 16px;font-size:15px;line-height:1.6;color:#4b5563;">A customer has requested a Setika trial workspace.</p>
+            <table role="presentation" width="100%%" cellspacing="0" cellpadding="0" style="font-size:14px;line-height:1.6;color:#374151;">
+              <tr><td style="padding:6px 0;font-weight:800;">Company</td><td style="padding:6px 0;">%s</td></tr>
+              <tr><td style="padding:6px 0;font-weight:800;">Contact</td><td style="padding:6px 0;">%s</td></tr>
+              <tr><td style="padding:6px 0;font-weight:800;">Email</td><td style="padding:6px 0;">%s</td></tr>
+              <tr><td style="padding:6px 0;font-weight:800;">Mobile</td><td style="padding:6px 0;">%s</td></tr>
+              <tr><td style="padding:6px 0;font-weight:800;">Workspace</td><td style="padding:6px 0;">%s</td></tr>
+            </table>
+            <a href="%s" style="display:inline-block;margin-top:18px;background:#e87839;color:#ffffff;text-decoration:none;border-radius:12px;padding:13px 20px;font-weight:800;font-size:14px;">Open signup requests</a>
+          </td></tr>
+        </table>
+      </td></tr>
+    </table>
+  </body>
+</html>`, escapedCompany, escapedName, escapedEmail, escapedMobile, escapedTenantURL, escapedAdminURL)
+	textBody := fmt.Sprintf("New Setika signup request\n\nCompany: %s\nContact: %s\nEmail: %s\nMobile: %s\nWorkspace: %s\n\nOpen signup requests: %s", message.CompanyName, fullName, message.Email, message.Mobile, message.TenantURL, message.AdminURL)
+	return "New Setika signup request", htmlBody, textBody
+}
+
+func signupWelcomeEmailContent(message SignupWelcomeMessage) (string, string, string) {
+	name := strings.TrimSpace(message.FirstName)
+	if name == "" {
+		name = "there"
+	}
+	escapedName := html.EscapeString(name)
+	escapedCompany := html.EscapeString(message.CompanyName)
+	escapedTenantURL := html.EscapeString(message.TenantURL)
+	escapedPlan := html.EscapeString(message.PlanCode)
+	escapedTrialEnds := html.EscapeString(message.TrialEndsAt)
+	htmlBody := fmt.Sprintf(`<!doctype html>
+<html>
+  <body style="margin:0;background:#f6f4ec;font-family:'Plus Jakarta Sans','Segoe UI',Arial,sans-serif;color:#172033;">
+    <table role="presentation" width="100%%" cellspacing="0" cellpadding="0" style="background:#f6f4ec;padding:32px 16px;">
+      <tr><td align="center">
+        <table role="presentation" width="100%%" cellspacing="0" cellpadding="0" style="max-width:580px;background:#ffffff;border:1px solid #e6eadf;border-radius:18px;overflow:hidden;">
+          <tr><td style="background:#588368;padding:26px 30px;color:#ffffff;"><img src="https://www.setika.one/assets/img/logo.png" width="145" alt="Setika" style="display:block;background:#ffffff;border-radius:10px;padding:8px;" /><h1 style="margin:18px 0 0;font-size:28px;line-height:1.2;">Your Setika workspace is ready</h1></td></tr>
+          <tr><td style="padding:30px;">
+            <p style="margin:0 0 16px;font-size:16px;line-height:1.6;">Hello %s,</p>
+            <p style="margin:0 0 20px;font-size:16px;line-height:1.6;color:#4b5563;">%s is now active on Setika. Your trial workspace is ready for setup.</p>
+            <a href="%s" style="display:inline-block;background:#e87839;color:#ffffff;text-decoration:none;border-radius:12px;padding:14px 22px;font-weight:800;font-size:15px;">Open workspace</a>
+            <div style="margin-top:24px;padding:18px;border-radius:14px;background:#f8faf9;border:1px solid #e6eadf;">
+              <p style="margin:0 0 10px;font-weight:800;color:#172033;">Included to help you get started</p>
+              <ul style="margin:0;padding-left:20px;color:#4b5563;line-height:1.7;font-size:14px;">
+                <li>Employee records and organization setup</li>
+                <li>Attendance, leave, payroll, documents, hiring, and onboarding foundations</li>
+                <li>Reports and role-based access controls for your HR team</li>
+              </ul>
+            </div>
+            <p style="margin:22px 0 0;font-size:13px;line-height:1.6;color:#6b7280;">Plan: %s%s</p>
+          </td></tr>
+        </table>
+      </td></tr>
+    </table>
+  </body>
+</html>`, escapedName, escapedCompany, escapedTenantURL, escapedPlan, trialEndsSuffix(escapedTrialEnds))
+	textBody := fmt.Sprintf("Hello %s,\n\n%s is now active on Setika. Open your workspace: %s\n\nIncluded to help you get started:\n- Employee records and organization setup\n- Attendance, leave, payroll, documents, hiring, and onboarding foundations\n- Reports and role-based access controls for your HR team\n\nPlan: %s%s", name, message.CompanyName, message.TenantURL, message.PlanCode, trialEndsSuffix(message.TrialEndsAt))
+	return "Your Setika workspace is ready", htmlBody, textBody
+}
+
+func trialEndsSuffix(value string) string {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return ""
+	}
+	return " · Trial ends " + value
+}
+
+func verificationEmailLogoURL(verificationURL string) string {
+	return "https://www.setika.one/assets/img/logo.png"
 }
 
 func (s *smtpIdentityCommunication) sendEmail(ctx context.Context, recipient string, subject string, htmlBody string, textBody string) error {

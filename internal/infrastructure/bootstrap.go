@@ -6,6 +6,7 @@ import (
 
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/ranakdinesh/setika/internal/config"
+	"github.com/ranakdinesh/setika/internal/infrastructure/coredb"
 	"github.com/ranakdinesh/setika/internal/infrastructure/db"
 	"github.com/ranakdinesh/setika/internal/infrastructure/grpc"
 	"github.com/ranakdinesh/setika/internal/infrastructure/hls"
@@ -40,6 +41,10 @@ func Bootstrap(ctx context.Context, cfg *config.Config, log *logger.Loggerx) (*I
 	pool := db.NewPool(ctx, cfg.DatabaseURL)
 
 	log.Info(ctx).Int32("max_conns", cfg.DBMaxConns).Msg("Database connected")
+	if err := coredb.RunMigrations(ctx, pool); err != nil {
+		return nil, fmt.Errorf("core db migrations: %w", err)
+	}
+	log.Info(ctx).Msg("Core database migrations ready")
 
 	// Redis (optional)
 	var rdb *goredis.Client

@@ -18,6 +18,8 @@ type adminTenantResponse struct {
 	ID               uuid.UUID  `json:"id"`
 	Name             string     `json:"name"`
 	Kind             string     `json:"kind"`
+	Subdomain        *string    `json:"subdomain,omitempty"`
+	DisplayName      *string    `json:"display_name,omitempty"`
 	TrialEndsAt      *time.Time `json:"trial_ends_at,omitempty"`
 	SubscriptionPlan *string    `json:"subscription_plan,omitempty"`
 	CreatedAt        time.Time  `json:"created_at"`
@@ -57,11 +59,14 @@ func (h *Handler) AdminListTenants(w http.ResponseWriter, r *http.Request) {
 				t.subscription_plan,
 				t.created_at,
 				t.updated_at,
+				tp.subdomain,
+				tp.display_name,
 				admin_user.id,
 				NULLIF(btrim(concat_ws(' ', admin_user.first_name, admin_user.last_name)), ''),
 				admin_user.email,
 				admin_user.mobile
 			FROM auth.tenants t
+			LEFT JOIN hrms.tenant_profiles tp ON tp.tenant_id = t.id
 			LEFT JOIN LATERAL (
 				SELECT
 					u.id,
@@ -97,6 +102,8 @@ func (h *Handler) AdminListTenants(w http.ResponseWriter, r *http.Request) {
 			var tenant adminTenantResponse
 			var trialEndsAt sql.NullTime
 			var subscriptionPlan sql.NullString
+			var subdomain sql.NullString
+			var displayName sql.NullString
 			var adminUserID pgtype.UUID
 			var adminName sql.NullString
 			var adminEmail sql.NullString
@@ -109,6 +116,8 @@ func (h *Handler) AdminListTenants(w http.ResponseWriter, r *http.Request) {
 				&subscriptionPlan,
 				&tenant.CreatedAt,
 				&tenant.UpdatedAt,
+				&subdomain,
+				&displayName,
 				&adminUserID,
 				&adminName,
 				&adminEmail,
@@ -122,6 +131,8 @@ func (h *Handler) AdminListTenants(w http.ResponseWriter, r *http.Request) {
 			if subscriptionPlan.Valid {
 				tenant.SubscriptionPlan = &subscriptionPlan.String
 			}
+			tenant.Subdomain = nullableString(subdomain)
+			tenant.DisplayName = nullableString(displayName)
 			tenant.AdminUserID = nullableUUID(adminUserID)
 			tenant.AdminName = nullableString(adminName)
 			tenant.AdminEmail = nullableString(adminEmail)

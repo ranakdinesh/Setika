@@ -8,9 +8,9 @@ import (
 	"strings"
 
 	"github.com/google/uuid"
-	hrmsdomain "github.com/ranakdinesh/setika-hrms/core/domain"
-	hrmsports "github.com/ranakdinesh/setika-hrms/core/ports"
-	"github.com/ranakdinesh/setika-hrms/pkg/permissions"
+	hrmsdomain "github.com/ranakdinesh/spur-hrms/core/domain"
+	hrmsports "github.com/ranakdinesh/spur-hrms/core/ports"
+	"github.com/ranakdinesh/spur-hrms/pkg/permissions"
 	identitymodule "github.com/ranakdinesh/spur-identity"
 )
 

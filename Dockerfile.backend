@@ -5,21 +5,16 @@ RUN apk add --no-cache git ca-certificates tzdata
 WORKDIR /workspace
 
 COPY setika/go.mod setika/go.sum ./setika/
-COPY spur-hrms/go.mod spur-hrms/go.sum ./spur-hrms/
-COPY spur-document-sign/go.mod spur-document-sign/go.sum ./spur-document-sign/
-COPY spur-identity/go.mod spur-identity/go.sum ./spur-identity/
 
 WORKDIR /workspace/setika
 RUN go mod download
 
 WORKDIR /workspace
 COPY setika ./setika
-COPY spur-hrms ./spur-hrms
-COPY spur-document-sign ./spur-document-sign
-COPY spur-identity ./spur-identity
 
 WORKDIR /workspace/setika
 RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -ldflags="-s -w" -o /out/setika ./cmd/main.go
+RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -ldflags="-s -w" -o /out/demo-seed ./cmd/demo-seed
 
 FROM alpine:3.20
 
@@ -28,6 +23,7 @@ RUN apk add --no-cache ca-certificates tzdata wget
 WORKDIR /app
 
 COPY --from=builder /out/setika ./setika
+COPY --from=builder /out/demo-seed ./demo-seed
 
 RUN mkdir -p /app/keys && chmod 700 /app/keys
 

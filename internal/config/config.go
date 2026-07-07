@@ -63,6 +63,7 @@ type Config struct {
 	SendGridAPIKey             string        `env:"SENDGRID_API_KEY"`
 	SendGridSandboxMode        bool          `env:"SENDGRID_SANDBOX_MODE" default:"false"`
 	EmailWebhookSigningSecret  string        `env:"EMAIL_WEBHOOK_SIGNING_SECRET"`
+	SignupAlertEmail           string        `env:"SETIKA_SIGNUP_ALERT_EMAIL"`
 	StorageProvider            string        `env:"STORAGE_PROVIDER" default:"minio"`
 	StorageEnabled             bool          `env:"STORAGE_ENABLED" default:"false"`
 	StorageBucket              string        `env:"STORAGE_BUCKET"`

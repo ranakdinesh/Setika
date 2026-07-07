@@ -11,15 +11,15 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgconn"
-	hrms "github.com/ranakdinesh/setika-hrms"
-	hrmspermissions "github.com/ranakdinesh/setika-hrms/pkg/permissions"
 	identitycommunication "github.com/ranakdinesh/setika/internal/adapters/communication/identity"
 	apphandlers "github.com/ranakdinesh/setika/internal/adapters/httpx/handlers"
 	identityadapter "github.com/ranakdinesh/setika/internal/adapters/identity"
 	"github.com/ranakdinesh/setika/internal/config"
 	"github.com/ranakdinesh/setika/internal/infrastructure"
 	"github.com/ranakdinesh/setika/internal/logger"
-	documentsign "github.com/ranakdinesh/spur-document-sign"
+	documentsign "github.com/ranakdinesh/spur-documentsign"
+	hrms "github.com/ranakdinesh/spur-hrms"
+	hrmspermissions "github.com/ranakdinesh/spur-hrms/pkg/permissions"
 	identity "github.com/ranakdinesh/spur-identity"
 	"github.com/ranakdinesh/spur-identity/adapters/http/httputil"
 	"golang.org/x/crypto/bcrypt"
@@ -72,13 +72,14 @@ func New(ctx context.Context) (*App, error) {
 		BootstrapPassword: cfg.IdentityBootstrapPassword,
 	}
 	identityLog := infra.Log.Logger()
+	identityCommunication := identitycommunication.New(cfg, infra.Log)
 	identityModule, err := identity.New(ctx, identity.Options{
 		DB:            infra.DB,
 		Log:           &identityLog,
 		Cfg:           identityCfg,
 		PrivateKey:    privateKey,
 		Redis:         infra.Redis,
-		Communication: identitycommunication.New(cfg, infra.Log),
+		Communication: identityCommunication,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("identity: %w", err)
@@ -142,12 +143,16 @@ func New(ctx context.Context) (*App, error) {
 	httpHandlers := apphandlers.New(apphandlers.Options{
 		Identity:         identityModule,
 		Hrms:             hrmsModule,
+		Communication:    identityCommunication,
 		DB:               infra.DB,
+		Redis:            infra.Redis,
 		Log:              infra.Log,
 		PrivateKey:       privateKey,
 		IdentityIssuer:   cfg.IdentityIssuer,
 		LoginSessionTTL:  cfg.SetikaLoginSessionTTL,
 		TenantBaseDomain: cfg.TenantBaseDomain,
+		FrontendURL:      cfg.FrontendURL,
+		SignupAlertEmail: cfg.SignupAlertEmail,
 	})
 
 	infra.HTTP.Mount(func(r chi.Router) {
@@ -158,7 +163,16 @@ func New(ctx context.Context) (*App, error) {
 		r.Post("/setika/auth/login", httpHandlers.Login)
 		r.Post("/setika/applicants/apply", httpHandlers.ApplyForJob)
 		r.Post("/signup", httpHandlers.Signup)
+		r.Get("/signup/verify", httpHandlers.VerifySignup)
+		r.Get("/signup/subdomain-availability", httpHandlers.SignupSubdomainAvailability)
+		r.With(identityModule.AuthMiddleware()).Get("/master-data/countries", httpHandlers.MasterCountries)
+		r.With(identityModule.AuthMiddleware()).Get("/master-data/timezones", httpHandlers.MasterTimezones)
 		r.With(identityModule.AuthMiddleware()).Get("/admin/tenants", httpHandlers.AdminListTenants)
+		r.With(identityModule.AuthMiddleware()).Post("/admin/tenants/provision", httpHandlers.AdminProvisionTenant)
+		r.With(identityModule.AuthMiddleware()).Get("/admin/signup-intents", httpHandlers.AdminListSignupIntents)
+		r.With(identityModule.AuthMiddleware()).Put("/admin/signup-intents/{intentID}", httpHandlers.AdminUpdateSignupIntent)
+		r.With(identityModule.AuthMiddleware()).Delete("/admin/signup-intents/{intentID}", httpHandlers.AdminDeleteSignupIntent)
+		r.With(identityModule.AuthMiddleware()).Post("/admin/signup-intents/{intentID}/manual-provision", httpHandlers.AdminManualProvisionSignupIntent)
 		r.With(identityModule.AuthMiddleware()).Put("/admin/tenants/{tenantID}/users/{userID}", httpHandlers.AdminUpdateTenantUser)
 		// SPUR:ROUTES
 		identityModule.RegisterRoutes(r)

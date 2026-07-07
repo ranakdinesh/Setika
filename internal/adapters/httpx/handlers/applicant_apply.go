@@ -12,9 +12,9 @@ import (
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
-	hrmsdomain "github.com/ranakdinesh/setika-hrms/core/domain"
-	hrmsports "github.com/ranakdinesh/setika-hrms/core/ports"
 	identityadapter "github.com/ranakdinesh/setika/internal/adapters/identity"
+	hrmsdomain "github.com/ranakdinesh/spur-hrms/core/domain"
+	hrmsports "github.com/ranakdinesh/spur-hrms/core/ports"
 )
 
 type applicantApplyRequest struct {

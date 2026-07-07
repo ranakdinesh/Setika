@@ -10,6 +10,9 @@ keys/
 vendor/
 
 # Next.js
+ui/.next/
+ui/node_modules/
+ui/out/
 ui/studio/.next/
 ui/studio/node_modules/
 ui/studio/out/
