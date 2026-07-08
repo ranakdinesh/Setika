@@ -10,7 +10,7 @@ require (
 	github.com/jackc/pgx/v5 v5.9.2
 	github.com/prometheus/client_golang v1.19.1
 	github.com/ranakdinesh/spur-documentsign v0.0.0-20260705172503-28c452dff0a0
-	github.com/ranakdinesh/spur-hrms v0.0.0-20260708103711-35ddfeeb21ff
+	github.com/ranakdinesh/spur-hrms v0.0.0-20260708120149-d7c23c364909
 	github.com/ranakdinesh/spur-identity v1.1.7-0.20260705180659-6e8892f7db2c
 	github.com/redis/go-redis/v9 v9.19.0
 	github.com/rs/zerolog v1.35.1

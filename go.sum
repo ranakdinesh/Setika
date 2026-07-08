@@ -303,8 +303,8 @@ github.com/prometheus/procfs v0.12.0 h1:jluTpSng7V9hY0O2R9DzzJHYb2xULk9VTR1V1R/k
 github.com/prometheus/procfs v0.12.0/go.mod h1:pcuDEFsWDnvcgNzo4EEweacyhjeA9Zk3cnaOZAZEfOo=
 github.com/ranakdinesh/spur-documentsign v0.0.0-20260705172503-28c452dff0a0 h1:DiJ6SdNVHVqkiK6EaShc9QdBI0Qj3Ma5TFJg4c/t7pY=
 github.com/ranakdinesh/spur-documentsign v0.0.0-20260705172503-28c452dff0a0/go.mod h1:Y2jPQ/lUZW3pMO7qaHQwrXuNQORduO5Bw3wy9wSTsz0=
-github.com/ranakdinesh/spur-hrms v0.0.0-20260708103711-35ddfeeb21ff h1:Sf5LA/GX4c77/H3ByM7y6KqgzHaw4hSVNLHEFzrRlBE=
-github.com/ranakdinesh/spur-hrms v0.0.0-20260708103711-35ddfeeb21ff/go.mod h1:YzQ35sZNV8/V/ipaZBdUxkZN994vKq6Ig92Zz5W4R3Y=
+github.com/ranakdinesh/spur-hrms v0.0.0-20260708120149-d7c23c364909 h1:qSv8sb2PrFr7SO5ocCV4XIBFS/2YTApmHR26lWn8C/c=
+github.com/ranakdinesh/spur-hrms v0.0.0-20260708120149-d7c23c364909/go.mod h1:YzQ35sZNV8/V/ipaZBdUxkZN994vKq6Ig92Zz5W4R3Y=
 github.com/ranakdinesh/spur-identity v1.1.7-0.20260705180659-6e8892f7db2c h1:+SInMso+QeXntnKuyZNkFpgdlAlFisZGElNB4n/7yoU=
 github.com/ranakdinesh/spur-identity v1.1.7-0.20260705180659-6e8892f7db2c/go.mod h1:2oGP3ZEF3cY3ndL9SvQGWtyA+j0z3eBOtFXjdZMxWXA=
 github.com/ranakdinesh/spur-messaging v1.0.4 h1:v3DMdYkRTfZi347+POFDlVTL0u0wGV2t6GYl8R6zQlE=
