@@ -80,4 +80,87 @@ wait_for_url() {
 wait_for_url "http://127.0.0.1:${DOCKER_BACKEND_PORT:-8087}/healthz" "backend"
 wait_for_url "http://127.0.0.1:${DOCKER_FRONTEND_PORT:-3003}/" "frontend"
 
+install_dev_nginx_site() {
+  if [ "${SETIKA_DEV_MANAGE_NGINX:-1}" != "1" ]; then
+    return 0
+  fi
+  if ! command -v nginx >/dev/null 2>&1; then
+    echo "nginx not found; skipping public dev proxy update"
+    return 0
+  fi
+
+  local site_path="${SETIKA_DEV_NGINX_SITE:-/etc/nginx/sites-available/setika-dev}"
+  local enabled_path="${SETIKA_DEV_NGINX_ENABLED_SITE:-/etc/nginx/sites-enabled/setika-dev}"
+  local backend_port="${DOCKER_BACKEND_PORT:-8087}"
+  local frontend_port="${DOCKER_FRONTEND_PORT:-3003}"
+  local minio_port="${DOCKER_MINIO_PORT:-9002}"
+
+  mkdir -p "$(dirname "$site_path")"
+  cat >"$site_path" <<NGINX
+server {
+    server_name dev.setika.one *.dev.setika.one;
+
+    client_max_body_size 50m;
+    client_header_buffer_size 64k;
+    large_client_header_buffers 8 128k;
+    proxy_buffer_size 128k;
+    proxy_buffers 8 128k;
+    proxy_busy_buffers_size 256k;
+
+    access_log /var/log/nginx/dev.setika.one.access.log;
+    error_log /var/log/nginx/dev.setika.one.error.log;
+
+    proxy_set_header Host \$host;
+    proxy_set_header X-Forwarded-Host \$host;
+    proxy_set_header X-Real-IP \$remote_addr;
+    proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto \$scheme;
+
+    location ~ ^/(healthz|readyz)$ {
+        proxy_pass http://127.0.0.1:${backend_port};
+    }
+
+    location /files/ {
+        rewrite ^/files/(.*)$ /\$1 break;
+        proxy_pass http://127.0.0.1:${minio_port};
+    }
+
+    # Dev API routes must reach the Go backend. If identity routes such as
+    # /roles/ or /users/{id}/roles/ fall through to Next.js, role management
+    # surfaces show frontend 404s even though the backend route exists.
+    location ~ ^/(auth|setika|signup|admin|users|roles|permissions|master-data|hrms|document-sign)(/|$) {
+        proxy_pass http://127.0.0.1:${backend_port};
+    }
+
+    location / {
+        proxy_pass http://127.0.0.1:${frontend_port};
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade \$http_upgrade;
+        proxy_set_header Connection "upgrade";
+    }
+
+    listen 443 ssl;
+    ssl_certificate /etc/letsencrypt/live/dev.setika.one/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/dev.setika.one/privkey.pem;
+    include /etc/letsencrypt/options-ssl-nginx.conf;
+    ssl_dhparam /etc/letsencrypt/ssl-dhparams.pem;
+}
+
+server {
+    listen 80;
+    listen [::]:80;
+    server_name dev.setika.one *.dev.setika.one;
+    return 301 https://\$host\$request_uri;
+}
+NGINX
+
+  if [ -d "$(dirname "$enabled_path")" ]; then
+    ln -sf "$site_path" "$enabled_path"
+  fi
+  nginx -t
+  nginx -s reload || systemctl reload nginx
+}
+
+install_dev_nginx_site
+
 echo "Setika dev deploy completed from $BRANCH at $timestamp"
