@@ -305,6 +305,8 @@ github.com/ranakdinesh/spur-documentsign v0.0.0-20260705172503-28c452dff0a0 h1:D
 github.com/ranakdinesh/spur-documentsign v0.0.0-20260705172503-28c452dff0a0/go.mod h1:Y2jPQ/lUZW3pMO7qaHQwrXuNQORduO5Bw3wy9wSTsz0=
 github.com/ranakdinesh/spur-hrms v0.0.0-20260709053857-2564e757467f h1:y+xrld4XPi5Sj//LXE2u8w9fwxDqCqKX0gF+z++5nHw=
 github.com/ranakdinesh/spur-hrms v0.0.0-20260709053857-2564e757467f/go.mod h1:YzQ35sZNV8/V/ipaZBdUxkZN994vKq6Ig92Zz5W4R3Y=
+github.com/ranakdinesh/spur-hrms v0.0.0-20260709055748-68eb08e4d4d8 h1:t0jRczEv5qx3MyNp7Wyg9gUd4TovZ88MBdAZc4Sf0O8=
+github.com/ranakdinesh/spur-hrms v0.0.0-20260709055748-68eb08e4d4d8/go.mod h1:YzQ35sZNV8/V/ipaZBdUxkZN994vKq6Ig92Zz5W4R3Y=
 github.com/ranakdinesh/spur-identity v1.1.7-0.20260705180659-6e8892f7db2c h1:+SInMso+QeXntnKuyZNkFpgdlAlFisZGElNB4n/7yoU=
 github.com/ranakdinesh/spur-identity v1.1.7-0.20260705180659-6e8892f7db2c/go.mod h1:2oGP3ZEF3cY3ndL9SvQGWtyA+j0z3eBOtFXjdZMxWXA=
 github.com/ranakdinesh/spur-messaging v1.0.4 h1:v3DMdYkRTfZi347+POFDlVTL0u0wGV2t6GYl8R6zQlE=
