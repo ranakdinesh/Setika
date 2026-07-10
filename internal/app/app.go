@@ -108,14 +108,15 @@ func New(ctx context.Context) (*App, error) {
 	}
 
 	hrmsModule, err := hrms.New(ctx, hrms.Options{
-		DB:                  infra.DB,
-		Log:                 &identityLog,
-		Cfg:                 hrmsConfigFromAppConfig(cfg),
-		TenantIDFromContext: httputil.GetTenantID,
-		UserIDFromContext:   httputil.GetUserID,
-		IsSuperAdmin:        httputil.IsSuperAdmin,
-		RolesFromContext:    httputil.GetRoles,
-		EmployeeIdentity:    employeeIdentity,
+		DB:                     infra.DB,
+		Log:                    &identityLog,
+		Cfg:                    hrmsConfigFromAppConfig(cfg),
+		TenantIDFromContext:    httputil.GetTenantID,
+		UserIDFromContext:      httputil.GetUserID,
+		IsSuperAdmin:           httputil.IsSuperAdmin,
+		RolesFromContext:       httputil.GetRoles,
+		PermissionsFromContext: httputil.GetPermissions,
+		EmployeeIdentity:       employeeIdentity,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("hrms: %w", err)

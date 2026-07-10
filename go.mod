@@ -9,9 +9,9 @@ require (
 	github.com/google/uuid v1.6.0
 	github.com/jackc/pgx/v5 v5.9.2
 	github.com/prometheus/client_golang v1.19.1
-	github.com/ranakdinesh/spur-documentsign v0.0.0-20260705172503-28c452dff0a0
-	github.com/ranakdinesh/spur-hrms v0.0.0-20260709055748-68eb08e4d4d8
-	github.com/ranakdinesh/spur-identity v1.1.7-0.20260705180659-6e8892f7db2c
+	github.com/ranakdinesh/spur-documentsign v0.0.0-20260710180603-fdc737962f97
+	github.com/ranakdinesh/spur-hrms v0.0.0-20260710180547-592df41ec0da
+	github.com/ranakdinesh/spur-identity v1.1.7-0.20260710180525-3b7d4e1b1ba6
 	github.com/redis/go-redis/v9 v9.19.0
 	github.com/rs/zerolog v1.35.1
 	go.opentelemetry.io/otel/trace v1.39.0
@@ -82,6 +82,7 @@ require (
 	github.com/prometheus/client_model v0.5.0 // indirect
 	github.com/prometheus/common v0.48.0 // indirect
 	github.com/prometheus/procfs v0.12.0 // indirect
+	github.com/ranakdinesh/spur-template v0.1.2-0.20260710175952-3f8a3553240b // indirect
 	github.com/robfig/cron v1.2.0 // indirect
 	github.com/seatgeek/logrus-gelf-formatter v0.0.0-20210414080842-5b05eb8ff761 // indirect
 	github.com/sirupsen/logrus v1.9.4 // indirect
