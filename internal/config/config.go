@@ -42,6 +42,8 @@ type Config struct {
 	IdentityBootstrapPassword  string        `env:"IDENTITY_BOOTSTRAP_PASSWORD"`
 	IdentityBootstrapFirstName string        `env:"IDENTITY_BOOTSTRAP_FIRST_NAME" default:"Super"`
 	IdentityBootstrapLastName  string        `env:"IDENTITY_BOOTSTRAP_LAST_NAME" default:"Admin"`
+	IdentityExternalEnabled    bool          `env:"IDENTITY_EXTERNAL_IDENTITY_ENABLED" default:"false"`
+	IdentityExternalProviders  string        `env:"IDENTITY_EXTERNAL_OIDC_PROVIDERS_JSON" default:"[]"`
 	SetikaLoginSessionTTL      time.Duration `env:"SETIKA_LOGIN_SESSION_TTL" default:"4320h"`
 	AuthClientID               string        `env:"AUTH_CLIENT_ID" envDefault:""`
 	AuthClientSecret           string        `env:"AUTH_CLIENT_SECRET" envDefault:""`

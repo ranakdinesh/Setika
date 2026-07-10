@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/rand"
 	"encoding/hex"
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"strings"
@@ -70,6 +71,13 @@ func New(ctx context.Context) (*App, error) {
 		CookieSecure:      cfg.AppEnv == "production",
 		BootstrapKey:      cfg.APIKeyValue,
 		BootstrapPassword: cfg.IdentityBootstrapPassword,
+
+		ExternalIdentityEnabled: cfg.IdentityExternalEnabled,
+	}
+	if cfg.IdentityExternalProviders != "" {
+		if err := json.Unmarshal([]byte(cfg.IdentityExternalProviders), &identityCfg.ExternalOIDCProviders); err != nil {
+			return nil, fmt.Errorf("IDENTITY_EXTERNAL_OIDC_PROVIDERS_JSON: %w", err)
+		}
 	}
 	identityLog := infra.Log.Logger()
 	identityCommunication := identitycommunication.New(cfg, infra.Log)
