@@ -259,8 +259,10 @@ func syncHRMSBaselineRoles(ctx context.Context, db interface {
 	employeePermissions := hrmspermissions.ManifestRolePermissions("EMPLOYEE")
 	managerPermissions := hrmspermissions.ManifestRolePermissions("MANAGER")
 	applicantPermissions := hrmspermissions.ManifestRolePermissions("APPLICANT")
-	if len(employeePermissions) == 0 || len(managerPermissions) == 0 || len(applicantPermissions) == 0 {
-		return fmt.Errorf("hrms employee/manager/applicant role permissions are not declared")
+	hrPermissions := hrmspermissions.ManifestRolePermissions("HR")
+	tenantAdminPermissions := hrmspermissions.ManifestRolePermissions("TENANT_ADMIN")
+	if len(employeePermissions) == 0 || len(managerPermissions) == 0 || len(applicantPermissions) == 0 || len(hrPermissions) == 0 || len(tenantAdminPermissions) == 0 {
+		return fmt.Errorf("hrms baseline role permissions are not declared")
 	}
 
 	if _, err := db.Exec(ctx, `
@@ -273,6 +275,8 @@ func syncHRMSBaselineRoles(ctx context.Context, db interface {
 		ON CONFLICT (tenant_id, module_id) DO UPDATE
 		SET status = 'active',
 			access_source = EXCLUDED.access_source,
+			starts_at = LEAST(auth.tenant_modules.starts_at, NOW()),
+			ends_at = NULL,
 			updated_at = NOW()
 	`); err != nil {
 		return fmt.Errorf("enable hrms for tenants: %w", err)
@@ -306,15 +310,84 @@ func syncHRMSBaselineRoles(ctx context.Context, db interface {
 	}
 
 	if _, err := db.Exec(ctx, `
+		INSERT INTO auth.roles (id, tenant_id, name, code, description, is_system)
+		SELECT gen_random_uuid(), t.id, 'Manager', 'MANAGER',
+			'Team visibility, leave approvals, and growth follow-up permissions on top of Employee.', TRUE
+		FROM auth.tenants t
+		WHERE t.kind <> 'ops'
+		  AND NOT EXISTS (
+			SELECT 1 FROM auth.roles r
+			WHERE r.tenant_id = t.id
+			  AND (UPPER(COALESCE(r.code, '')) = 'MANAGER' OR r.name = 'Manager')
+		  )
+	`); err != nil {
+		return fmt.Errorf("ensure manager roles: %w", err)
+	}
+
+	if _, err := db.Exec(ctx, `
 		UPDATE auth.roles
 		SET code = 'MANAGER',
 			name = 'Manager',
-			description = 'Team visibility, leave approvals, and attendance review permissions on top of Employee.',
+			description = 'Team visibility, leave approvals, and growth follow-up permissions on top of Employee.',
 			is_system = TRUE
 		WHERE tenant_id IN (SELECT id FROM auth.tenants WHERE kind <> 'ops')
 		  AND (UPPER(COALESCE(code, '')) = 'MANAGER' OR name = 'Manager')
 	`); err != nil {
 		return fmt.Errorf("normalize manager roles: %w", err)
+	}
+
+	if _, err := db.Exec(ctx, `
+		INSERT INTO auth.roles (id, tenant_id, name, code, description, is_system)
+		SELECT gen_random_uuid(), t.id, 'HR', 'HR',
+			'HR operations role for growth governance, people operations, and employee lifecycle management.', TRUE
+		FROM auth.tenants t
+		WHERE t.kind <> 'ops'
+		  AND NOT EXISTS (
+			SELECT 1 FROM auth.roles r
+			WHERE r.tenant_id = t.id
+			  AND (UPPER(COALESCE(r.code, '')) = 'HR' OR r.name = 'HR')
+		  )
+	`); err != nil {
+		return fmt.Errorf("ensure hr roles: %w", err)
+	}
+
+	if _, err := db.Exec(ctx, `
+		UPDATE auth.roles
+		SET code = 'HR',
+			name = 'HR',
+			description = 'HR operations role for growth governance, people operations, and employee lifecycle management.',
+			is_system = TRUE
+		WHERE tenant_id IN (SELECT id FROM auth.tenants WHERE kind <> 'ops')
+		  AND (UPPER(COALESCE(code, '')) = 'HR' OR name = 'HR')
+	`); err != nil {
+		return fmt.Errorf("normalize hr roles: %w", err)
+	}
+
+	if _, err := db.Exec(ctx, `
+		INSERT INTO auth.roles (id, tenant_id, name, code, description, is_system)
+		SELECT gen_random_uuid(), t.id, 'Tenant Admin', 'TENANT_ADMIN',
+			'Tenant-wide administration role for assigned modules, setup, and governance.', TRUE
+		FROM auth.tenants t
+		WHERE t.kind <> 'ops'
+		  AND NOT EXISTS (
+			SELECT 1 FROM auth.roles r
+			WHERE r.tenant_id = t.id
+			  AND (UPPER(COALESCE(r.code, '')) = 'TENANT_ADMIN' OR r.name = 'Tenant Admin')
+		  )
+	`); err != nil {
+		return fmt.Errorf("ensure tenant admin roles: %w", err)
+	}
+
+	if _, err := db.Exec(ctx, `
+		UPDATE auth.roles
+		SET code = 'TENANT_ADMIN',
+			name = 'Tenant Admin',
+			description = 'Tenant-wide administration role for assigned modules, setup, and governance.',
+			is_system = TRUE
+		WHERE tenant_id IN (SELECT id FROM auth.tenants WHERE kind <> 'ops')
+		  AND (UPPER(COALESCE(code, '')) = 'TENANT_ADMIN' OR name = 'Tenant Admin')
+	`); err != nil {
+		return fmt.Errorf("normalize tenant admin roles: %w", err)
 	}
 
 	if _, err := db.Exec(ctx, `
@@ -354,8 +427,10 @@ func syncHRMSBaselineRoles(ctx context.Context, db interface {
 			(r.code = 'EMPLOYEE' AND NOT (p.key = ANY($1::text[])))
 			OR (r.code = 'MANAGER' AND NOT (p.key = ANY($2::text[])))
 			OR (r.code = 'APPLICANT' AND NOT (p.key = ANY($3::text[])))
+			OR (r.code = 'HR' AND NOT (p.key = ANY($4::text[])))
+			OR (r.code = 'TENANT_ADMIN' AND NOT (p.key = ANY($5::text[])))
 		  )
-	`, employeePermissions, managerPermissions, applicantPermissions); err != nil {
+	`, employeePermissions, managerPermissions, applicantPermissions, hrPermissions, tenantAdminPermissions); err != nil {
 		return fmt.Errorf("prune hrms baseline role permissions: %w", err)
 	}
 
@@ -367,8 +442,10 @@ func syncHRMSBaselineRoles(ctx context.Context, db interface {
 		WHERE (r.code = 'EMPLOYEE' AND p.key = ANY($1::text[]))
 		   OR (r.code = 'MANAGER' AND p.key = ANY($2::text[]))
 		   OR (r.code = 'APPLICANT' AND p.key = ANY($3::text[]))
+		   OR (r.code = 'HR' AND p.key = ANY($4::text[]))
+		   OR (r.code = 'TENANT_ADMIN' AND p.key = ANY($5::text[]))
 		ON CONFLICT DO NOTHING
-	`, employeePermissions, managerPermissions, applicantPermissions); err != nil {
+	`, employeePermissions, managerPermissions, applicantPermissions, hrPermissions, tenantAdminPermissions); err != nil {
 		return fmt.Errorf("assign hrms baseline role permissions: %w", err)
 	}
 

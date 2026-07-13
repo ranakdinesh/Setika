@@ -16,6 +16,7 @@ import (
 	"github.com/jackc/pgx/v5"
 	hrmsdomain "github.com/ranakdinesh/spur-hrms/core/domain"
 	hrmsports "github.com/ranakdinesh/spur-hrms/core/ports"
+	hrmspermissions "github.com/ranakdinesh/spur-hrms/pkg/permissions"
 	"github.com/ranakdinesh/spur-identity/adapters/http/httputil"
 	identitydb "github.com/ranakdinesh/spur-identity/adapters/postgres/db"
 	"golang.org/x/crypto/bcrypt"
@@ -770,15 +771,20 @@ func grantAssistedTenantAdminPermissions(ctx context.Context, roleID uuid.UUID) 
 	if tx == nil {
 		return errors.New("identity transaction is not available")
 	}
-	moduleCodes := []string{"identity", "profile", "dashboard", "hrms"}
+	hrmsTenantAdminPermissions := hrmspermissions.ManifestRolePermissions("TENANT_ADMIN")
+	if len(hrmsTenantAdminPermissions) == 0 {
+		return errors.New("hrms tenant admin role permissions are not declared")
+	}
+	moduleCodes := []string{"identity", "profile", "dashboard"}
 	_, err := tx.Exec(ctx, `
 		INSERT INTO auth.role_permissions (role_id, permission_id)
 		SELECT $1, p.id
 		FROM auth.permissions p
 		LEFT JOIN auth.modules m ON m.id = p.module_id
 		WHERE lower(COALESCE(m.code, p.module)) = ANY($2::text[])
+		   OR (COALESCE(m.code, p.module) = 'hrms' AND p.key = ANY($3::text[]))
 		ON CONFLICT DO NOTHING
-	`, roleID, moduleCodes)
+	`, roleID, moduleCodes, hrmsTenantAdminPermissions)
 	return err
 }
 
