@@ -110,7 +110,7 @@ func New(ctx context.Context) (*App, error) {
 	if err := identityModule.Services.ModuleService.RegisterManifest(ctx, documentSignModule.Manifest); err != nil {
 		return nil, fmt.Errorf("document-sign manifest: %w", err)
 	}
-	employeeIdentity, err := identityadapter.NewEmployeeIdentityAdapter(identityModule)
+	employeeIdentity, err := identityadapter.NewEmployeeIdentityAdapter(identityModule, infra.DB)
 	if err != nil {
 		return nil, fmt.Errorf("hrms employee identity adapter: %w", err)
 	}

@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgxpool"
 	hrmsdomain "github.com/ranakdinesh/spur-hrms/core/domain"
 	hrmsports "github.com/ranakdinesh/spur-hrms/core/ports"
 	"github.com/ranakdinesh/spur-hrms/pkg/permissions"
@@ -18,11 +19,15 @@ type EmployeeIdentityAdapter struct {
 	registration any
 	auth         any
 	rbac         any
+	db           *pgxpool.Pool
 }
 
-func NewEmployeeIdentityAdapter(module *identitymodule.Module) (*EmployeeIdentityAdapter, error) {
+func NewEmployeeIdentityAdapter(module *identitymodule.Module, db *pgxpool.Pool) (*EmployeeIdentityAdapter, error) {
 	if module == nil || module.Services == nil {
 		return nil, errors.New("identity module is not configured")
+	}
+	if db == nil {
+		return nil, errors.New("identity db is not configured")
 	}
 	if module.Services.RegistrationService == nil {
 		return nil, errors.New("identity registration service is not configured")
@@ -37,6 +42,7 @@ func NewEmployeeIdentityAdapter(module *identitymodule.Module) (*EmployeeIdentit
 		registration: module.Services.RegistrationService,
 		auth:         module.Services.AuthService,
 		rbac:         module.Services.RBACService,
+		db:           db,
 	}, nil
 }
 
